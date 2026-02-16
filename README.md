@@ -74,21 +74,21 @@ The tools expect a standard layout at `/data/user_scripts/`:
 
 ```bash
 # DNA basecalling with modifications
-basecalling/run_dorado_local_dirs.sh \
+run_dorado_local_dirs.sh \
   --dirlist dna_dirs.txt \
   --model sup@v5.0.0 \
   --mod 5mCG_5hmCG,6mA \
   --output ./dna_output
 
 # RNA basecalling with poly-A estimation
-basecalling/run_dorado_local_dirs.sh \
+run_dorado_local_dirs.sh \
   --dirlist rna_dirs.txt \
   --model rna004_130bps_sup@v5.1.0 \
   --estimate-poly-a \
   --output ./rna_output
 
 # Dry run (print commands without executing)
-basecalling/run_dorado_local_dirs.sh \
+run_dorado_local_dirs.sh \
   --dirlist dirs.txt \
   --model sup@v5.0.0 \
   --dryrun
@@ -98,7 +98,7 @@ basecalling/run_dorado_local_dirs.sh \
 
 ```bash
 # Submit array job for 10 pod5 paths, 2 at a time
-sbatch -J dorado_SAMPLE --array=1-10%2 basecalling/run_dorado_slurm.sh \
+sbatch -J dorado_SAMPLE --array=1-10%2 run_dorado_slurm.sh \
   --pod5list paths.list \
   --model sup@v5.0.0 \
   --mod 5mCG_5hmCG,6mA \
