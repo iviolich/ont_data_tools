@@ -1,0 +1,5 @@
+archive/
+logs/
+*.pyc
+__pycache__/
+.claude/
