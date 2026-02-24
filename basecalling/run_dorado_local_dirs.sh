@@ -18,7 +18,7 @@
 #   --estimate-poly-a   Enable poly-A tail estimation (for RNA)
 #   --dryrun            Print commands only; do not execute
 #   --output            Output directory (default: .)
-#   --dorado            Dorado version (default: 1.3.0)
+#   --dorado            Dorado version (default: current symlink)
 #   --reference         Path to reference genome for alignment
 #   --ref_name          Abbreviated reference name (auto-generated if omitted)
 #
@@ -44,11 +44,11 @@
 #     --mod 5mCG_5hmCG,6mA \
 #     --dryrun \
 #
-#   # Custom Dorado version and reference (dryrun)
+#   # Specific Dorado version and reference (dryrun)
 #   ./dorado_dirs.sh \
 #     --dirlist sample_dirs.txt \
 #     --model sup@v5.0.0 \
-#     --dorado 0.9.5 \
+#     --dorado 1.3.0 \
 #     --reference hg38.fa \
 #     --ref_name hg38 \
 #     --dryrun \
@@ -60,7 +60,6 @@ set -o pipefail
 # ------------------------------------------------------------------------------
 # Constants and Defaults
 # ------------------------------------------------------------------------------
-readonly DEFAULT_DORADO_VERSION="1.3.0"
 readonly DEFAULT_OUTPUT_DIR="./"
 readonly TOOLS_DIR="/data/user_scripts"
 readonly DORADO_BASE="${TOOLS_DIR}/tools/dorado"
@@ -74,7 +73,7 @@ MOD=""
 ESTIMATE_POLY_A=false
 DRY_RUN=false
 OUTPUT=""
-DORADO_VERSION="${DEFAULT_DORADO_VERSION}"
+DORADO_VERSION=""
 REFERENCE=""
 REF_NAME=""
 
@@ -133,11 +132,16 @@ fi
 # ------------------------------------------------------------------------------
 OUTPUT=${OUTPUT:-${DEFAULT_OUTPUT_DIR}}
 mkdir -p "$OUTPUT"
-DORADO="${DORADO_BASE}/dorado-${DORADO_VERSION}-linux-x64/bin/dorado"
+if [[ -n "$DORADO_VERSION" ]]; then
+    DORADO="${DORADO_BASE}/dorado-${DORADO_VERSION}-linux-x64/bin/dorado"
+else
+    DORADO="${DORADO_BASE}/current/bin/dorado"
+fi
 
 # Check executable when not in dryrun
 if [[ "$DRY_RUN" != true && ! -x "$DORADO" ]]; then
-    echo "Error: Dorado version ${DORADO_VERSION} not found at $DORADO" >&2
+    echo "Error: Dorado not found at $DORADO" >&2
+    [[ -z "$DORADO_VERSION" ]] && echo "Hint: create a symlink: ln -sfn ${DORADO_BASE}/dorado-VERSION-linux-x64 ${DORADO_BASE}/current" >&2
     exit 1
 fi
 
@@ -147,7 +151,7 @@ fi
 if [[ -x "$DORADO" ]]; then
     DORADO_VERSION_SHORT=$("$DORADO" --version 2>&1 | cut -d'+' -f1)
 else
-    DORADO_VERSION_SHORT="$DORADO_VERSION"
+    DORADO_VERSION_SHORT="${DORADO_VERSION:-unknown}"
 fi
 MODEL_BASENAME=$(basename "$MODEL")
 MODEL_NAME=$(echo "$MODEL_BASENAME" | cut -d'@' -f1)

@@ -63,10 +63,19 @@ The tools expect a standard layout at `/data/user_scripts/`:
 
 ## Deployment
 
-1. Clone this repo into `/data/user_scripts/scripts/`
+1. Clone this repo as `scripts` under `/data/user_scripts/`:
+   ```bash
+   git clone <repo_url> /data/user_scripts/scripts
+   ```
 2. Append the contents of `bashrc_additions.sh` to your `~/.bashrc`
 3. Install Dorado and miniconda into `/data/user_scripts/tools/`
-4. Install Python dependencies: `conda install pandas numpy`
+4. Create a `current` symlink pointing to the active Dorado version:
+   ```bash
+   ln -sfn /data/user_scripts/tools/dorado/dorado-1.3.0-linux-x64 \
+           /data/user_scripts/tools/dorado/current
+   ```
+   Update the symlink when upgrading Dorado — the basecalling scripts use it by default.
+5. Install Python dependencies: `conda install pandas numpy`
 
 ## Usage
 

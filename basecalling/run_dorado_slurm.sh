@@ -32,7 +32,7 @@ set -o xtrace        # Enable xtrace for debugging
 #   --mod         Modification model(s) (e.g., 5mCG_5hmCG,6mA)
 #   --duplex      Run duplex basecalling
 #   --project     Output base directory (default: ${BASE_DIR}/basecalled)
-#   --dorado      Dorado version (default: 1.3.1)
+#   --dorado      Dorado version (default: current symlink)
 #
 # EXAMPLE:
 #   sbatch -J dorado_FLYT2T --array=1-2%2 run_dorado_slurm.sh \
@@ -57,7 +57,7 @@ MODEL=""
 MOD=""
 DUPLEX=false
 PROJECT=""
-DORADO_VERSION="1.3.1"  # Default Dorado version, update this for new versions
+DORADO_VERSION=""
 
 # Parse named arguments
 set +e  # Temporarily disable error checking
@@ -68,7 +68,7 @@ while [[ "$#" -gt 0 ]]; do
         --model) MODEL="$2"; shift ;;
         --mod) MOD="$2"; shift ;;
         --project) PROJECT="$2"; shift ;;
-        --dorado) DORADO_VERSION="$2"; shift ;;  # Optional Dorado version, default is "latest"
+        --dorado) DORADO_VERSION="$2"; shift ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
@@ -90,12 +90,16 @@ fi
 POD5=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$POD5LIST")
 INBASEDIR="${SCRATCH_DIR}"
 
-# Set Dorado binary path based on the version passed (or use default "latest" version)
-DORADO="${DORADO_BASE}/dorado-${DORADO_VERSION}-linux-x64/bin/dorado"
+# Set Dorado binary path
+if [[ -n "$DORADO_VERSION" ]]; then
+    DORADO="${DORADO_BASE}/dorado-${DORADO_VERSION}-linux-x64/bin/dorado"
+else
+    DORADO="${DORADO_BASE}/current/bin/dorado"
+fi
 
-# Check if the Dorado binary exists
 if [[ ! -x "$DORADO" ]]; then
-    echo "Error: Dorado version $DORADO_VERSION not found at $DORADO."
+    echo "Error: Dorado not found at $DORADO."
+    [[ -z "$DORADO_VERSION" ]] && echo "Hint: create a symlink: ln -sfn ${DORADO_BASE}/dorado-VERSION-linux-x64 ${DORADO_BASE}/current"
     exit 1
 fi
 
