@@ -122,10 +122,10 @@ fi
 
 # Setup input and output directories
 if [[ ${POD5:0:2} == "s3" && ${POD5: -4} == ".tar" ]]; then
-    INPUT="${INBASEDIR}/${SAMPLEID}/${FULLNAME}"   
-    OUTPUT="${OUTBASEDIR}/${SAMPLEID}"
+    INPUT="${INBASEDIR}/${SAMPLEID}/${FULLNAME}"
+    OUTPUT="${OUTBASEDIR}"
     mkdir -p ${INPUT}
-    mkdir -p ${OUTPUT}   
+    mkdir -p ${OUTPUT}
     # Get the size of the S3 object in bytes
     POD5_SIZE=$(aws s3 ls ${POD5} --no-sign-request | awk '{print $3}')
 
@@ -147,8 +147,8 @@ if [[ ${POD5:0:2} == "s3" && ${POD5: -4} == ".tar" ]]; then
     fi
 
 elif [[ ${POD5: -4} == ".tar" ]]; then
-    INPUT="${INBASEDIR}/${SAMPLEID}/${FULLNAME}"    
-    OUTPUT="${OUTBASEDIR}/${SAMPLEID}"
+    INPUT="${INBASEDIR}/${SAMPLEID}/${FULLNAME}"
+    OUTPUT="${OUTBASEDIR}"
     mkdir -p ${INPUT}
     mkdir -p ${OUTPUT}
     # Check if INPUT directory is not empty (i.e., POD5 may have already been extracted)
@@ -161,7 +161,7 @@ elif [[ ${POD5: -4} == ".tar" ]]; then
 else
     echo "Setting up pod5s for: ${FULLNAME}"
     INPUT=$POD5
-    OUTPUT="${OUTBASEDIR}/${SAMPLEID}"
+    OUTPUT="${OUTBASEDIR}"
     #mkdir -p ${INPUT}
     mkdir -p ${OUTPUT}
 fi
