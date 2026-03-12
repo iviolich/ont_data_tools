@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --partition=long
 #SBATCH --nodes=1
-#SBATCH --mem=64gb
-#SBATCH --cpus-per-task=32
+#SBATCH --mem=128gb
+#SBATCH --cpus-per-task=64
 #SBATCH --output=%x_%j_%A_%a.log
 #SBATCH --time=2-00:00:00
 
@@ -62,7 +62,7 @@ REFERENCE=""
 PRESET="map-ont"
 MM2_OPTS=()
 PROJECT=""
-THREADS="${SLURM_CPUS_PER_TASK:-32}"
+THREADS="${SLURM_CPUS_PER_TASK:-64}"
 
 # Parse named arguments
 set +e  # Temporarily disable error checking
