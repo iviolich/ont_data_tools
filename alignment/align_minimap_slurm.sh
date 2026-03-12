@@ -52,6 +52,8 @@ set -o xtrace        # Enable xtrace for debugging
 # Constants — edit BASE_DIR for your cluster
 # ------------------------------------------------------------------------------
 readonly BASE_DIR="/private/nanopore"
+readonly TOOLS_DIR="${BASE_DIR}/tools"
+readonly MINIMAP2="${TOOLS_DIR}/minimap2/current/minimap2"
 readonly DEFAULT_OUTPUT_DIR="${BASE_DIR}/aligned"
 
 # Initialize variables
@@ -89,8 +91,8 @@ if [[ -z "$REFERENCE" ]]; then
 fi
 
 # Validate tools
-if ! command -v minimap2 &>/dev/null; then
-    echo "Error: minimap2 not found in PATH."
+if [[ ! -x "$MINIMAP2" ]]; then
+    echo "Error: minimap2 not found at $MINIMAP2."
     exit 1
 fi
 
@@ -107,7 +109,7 @@ FULLNAME=$(basename "$INPUT" | sed 's/\.\(bam\|fastq\.gz\|fastq\|fq\.gz\|fq\)$//
 REFNAME=$(basename "$REFERENCE" | sed 's/\.\(fa\|fasta\|fna\)\(\.gz\)\?$//')
 
 # Build version string
-MM2_VERSION=$(minimap2 --version 2>&1)
+MM2_VERSION=$("$MINIMAP2" --version 2>&1)
 VERSIONS="minimap2-${MM2_VERSION}_${PRESET}"
 
 # Set output directory
@@ -128,7 +130,7 @@ echo "Preset: ${PRESET}"
 echo "Threads: ${THREADS}"
 echo "Output: ${BAMNAME}.bam"
 
-minimap2 -ax "${PRESET}" -t "${THREADS}" "${MM2_OPTS[@]}" "${REFERENCE}" "${INPUT}" \
+"$MINIMAP2" -ax "${PRESET}" -t "${THREADS}" "${MM2_OPTS[@]}" "${REFERENCE}" "${INPUT}" \
     | samtools sort -@ "${THREADS}" -o "${BAMNAME}.bam"
 
 samtools index "${BAMNAME}.bam"
