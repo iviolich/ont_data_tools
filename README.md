@@ -1,12 +1,13 @@
 # ONT Data Tools
 
-Tools for Oxford Nanopore sequencing data: basecalling with Dorado, summary statistics, and archival/data management.
+Tools for Oxford Nanopore sequencing data: basecalling with Dorado, demultiplexing, alignment with minimap2, summary statistics, and archival/data management.
 
 For detailed workflow documentation, see the [Workflow Overview](https://ucsc-cgl.atlassian.net/wiki/spaces/~63c888081d7734b550c2052b/pages/2553348107/Workflow+Overview#).
 
 ## Prerequisites
 
-- [Dorado](https://github.com/nanoporetech/dorado) (basecaller)
+- [Dorado](https://github.com/nanoporetech/dorado) (basecaller and demultiplexer)
+- [minimap2](https://github.com/lh3/minimap2) (aligner)
 - [Miniconda](https://docs.conda.io/en/latest/miniconda.html) with Python 3, pandas, numpy
 - [samtools](http://www.htslib.org/)
 - GNU coreutils (parallel, gzip, tar)
@@ -29,6 +30,10 @@ The tools expect a standard layout at `/data/user_scripts/`:
 │   │   ├── tar_flowcells.sh
 │   │   ├── tar_cleanup.sh
 │   │   └── tar_report.sh
+│   ├── demultiplexing/
+│   │   └── demux_dorado_slurm.sh
+│   ├── alignment/
+│   │   └── align_minimap_slurm.sh
 │   ├── utilities/
 │   │   ├── cleanup.sh
 │   │   └── organize.sh
@@ -43,6 +48,14 @@ The tools expect a standard layout at `/data/user_scripts/`:
 
 - **`basecalling/run_dorado_local_dirs.sh`** — Tower basecalling. Processes a list of directories containing pod5 files sequentially with Dorado. Supports DNA/RNA models, modification calling, and dry-run mode.
 - **`basecalling/run_dorado_slurm.sh`** — SLURM cluster basecalling. Runs as an array job — each task processes one pod5 path from a list. Supports S3 downloads, tar extraction, and fast5-to-pod5 conversion. Edit `BASE_DIR` at the top for your cluster paths.
+
+### Demultiplexing
+
+- **`demultiplexing/demux_dorado_slurm.sh`** — SLURM cluster demultiplexing. Runs as an array job — each task demultiplexes one BAM using `dorado demux`. Supports re-classification or splitting pre-tagged reads from basecalling (`--no_classify`). Edit `BASE_DIR` at the top for your cluster paths.
+
+### Alignment
+
+- **`alignment/align_minimap_slurm.sh`** — SLURM cluster alignment. Runs as an array job — each task aligns one input file (BAM, FASTQ, or FASTQ.gz) to a reference genome using minimap2. Outputs a sorted, indexed BAM. Edit `BASE_DIR` at the top for your cluster paths.
 
 ### Summary Statistics
 
@@ -119,6 +132,41 @@ sbatch -J dorado_RNA --array=1-4%2 run_dorado_slurm.sh \
   --model rna004_130bps_sup@v5.1.0 \
   --drd_opts "--estimate-poly-a" \
   --project /private/nanopore/basecalled/MyRNAProject/
+```
+
+### Demultiplexing (SLURM cluster)
+
+```bash
+# Demultiplex, classifying reads during demux (kit not used at basecalling)
+sbatch -J demux_SAMPLE --array=1-4 demux_dorado_slurm.sh \
+  --bamlist bams.list \
+  --kit SQK-NBD114-24 \
+  --project /private/nanopore/demultiplexed/MyProject/
+
+# Split pre-tagged reads (kit was passed to dorado basecaller)
+sbatch -J demux_SAMPLE --array=1-4 demux_dorado_slurm.sh \
+  --bamlist bams.list \
+  --kit SQK-NBD114-24 \
+  --no_classify \
+  --project /private/nanopore/demultiplexed/MyProject/
+```
+
+### Alignment (SLURM cluster)
+
+```bash
+# DNA alignment (default map-ont preset)
+sbatch -J align_SAMPLE --array=1-4 align_minimap_slurm.sh \
+  --inputlist reads.list \
+  --reference /private/nanopore/references/genome.fa \
+  --project /private/nanopore/aligned/MyProject/
+
+# RNA/cDNA alignment (splice-aware)
+sbatch -J align_SAMPLE --array=1-4 align_minimap_slurm.sh \
+  --inputlist reads.list \
+  --reference /private/nanopore/references/genome.fa \
+  --preset splice \
+  --mm2_opts "--secondary=no -s 40 -G 350k" \
+  --project /private/nanopore/aligned/MyProject/
 ```
 
 ### Summary Statistics
