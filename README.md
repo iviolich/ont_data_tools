@@ -25,15 +25,20 @@ The tools expect a standard layout at `/data/user_scripts/`:
 │   ├── stats/
 │   │   ├── calculate_summary_stats_v3.py
 │   │   ├── calculate_summary_stats_v3_under_100kb.py
-│   │   └── calculate_summary_stats_rna.py
+│   │   ├── calculate_summary_stats_rna.py
+│   │   └── run_stats_slurm.sh
 │   ├── archival/
 │   │   ├── tar_flowcells.sh
 │   │   ├── tar_cleanup.sh
 │   │   └── tar_report.sh
 │   ├── demultiplexing/
-│   │   └── demux_dorado_slurm.sh
+│   │   ├── demux_dorado_slurm.sh
+│   │   └── demux_dorado_local.sh
 │   ├── alignment/
-│   │   └── align_minimap_slurm.sh
+│   │   ├── align_minimap_slurm.sh
+│   │   └── align_minimap_local.sh
+│   ├── summary/
+│   │   └── summary_dorado_slurm.sh
 │   ├── utilities/
 │   │   ├── cleanup.sh
 │   │   └── organize.sh
@@ -52,16 +57,23 @@ The tools expect a standard layout at `/data/user_scripts/`:
 ### Demultiplexing
 
 - **`demultiplexing/demux_dorado_slurm.sh`** — SLURM cluster demultiplexing. Runs as an array job — each task demultiplexes one BAM using `dorado demux`. Supports re-classification or splitting pre-tagged reads from basecalling (`--no_classify`). Edit `BASE_DIR` at the top for your cluster paths.
+- **`demultiplexing/demux_dorado_local.sh`** — Local machine demultiplexing. Processes all BAMs in a list sequentially. Same options as the SLURM version.
 
 ### Alignment
 
 - **`alignment/align_minimap_slurm.sh`** — SLURM cluster alignment. Runs as an array job — each task aligns one input file (BAM, FASTQ, or FASTQ.gz) to a reference genome using minimap2. Outputs a sorted, indexed BAM. Edit `BASE_DIR` at the top for your cluster paths.
+- **`alignment/align_minimap_local.sh`** — Local machine alignment. Processes all inputs in a list sequentially. Defaults to 48 threads (or `nproc` if fewer available), overridable with `--threads`.
+
+### Dorado Summary
+
+- **`summary/summary_dorado_slurm.sh`** — SLURM array job to run `dorado summary` on a list of BAMs, one per task. Outputs a gzipped TSV per BAM.
 
 ### Summary Statistics
 
 - **`stats/calculate_summary_stats_v3.py`** — Coverage, N50, and read length distribution for DNA runs (UL bins: 100kb–1Mb+).
 - **`stats/calculate_summary_stats_v3_under_100kb.py`** — Same metrics with finer bins for shorter reads (20kb–100kb+).
 - **`stats/calculate_summary_stats_rna.py`** — RNA-specific metrics: total reads (millions), quality score bins (Q5–Q25).
+- **`stats/run_stats_slurm.sh`** — Generic SLURM wrapper to run any stats script on the cluster, capturing stdout to a file for Google Sheets import.
 
 ### Archival
 
@@ -151,6 +163,15 @@ sbatch -J demux_SAMPLE --array=1-4 demux_dorado_slurm.sh \
   --project /private/nanopore/demultiplexed/MyProject/
 ```
 
+### Demultiplexing (local)
+
+```bash
+bash demux_dorado_local.sh \
+  --bamlist bams.list \
+  --kit SQK-NBD114-24 \
+  --project /data/demultiplexed/MyProject/
+```
+
 ### Alignment (SLURM cluster)
 
 ```bash
@@ -169,17 +190,37 @@ sbatch -J align_SAMPLE --array=1-4 align_minimap_slurm.sh \
   --project /private/nanopore/aligned/MyProject/
 ```
 
+### Alignment (local)
+
+```bash
+bash align_minimap_local.sh \
+  --inputlist reads.list \
+  --reference /data/references/genome.fa \
+  --project /data/aligned/MyProject/
+```
+
+### Dorado Summary (SLURM cluster)
+
+```bash
+sbatch -J summary_SAMPLE --array=1-4 summary_dorado_slurm.sh \
+  --bamlist bams.list \
+  --project /private/nanopore/summaries/MyProject/
+```
+
 ### Summary Statistics
 
 ```bash
-# DNA stats for all runs matching a pattern
+# DNA stats for all runs matching a pattern (local)
 pullstats_dna_ul --size 3.3 --dir "/data/run_*"
 
-# DNA stats with finer bins (HMW / under-100kb focus)
-pullstats_dna_hmw --size 3.3 --dir "/data/run_*"
-
-# RNA stats
+# RNA stats (local)
 pullstats_rna --dir "/data/rna_run_*"
+
+# Any stats script on SLURM (avoids running on login node)
+sbatch -J stats_SAMPLE run_stats_slurm.sh \
+  --script /path/to/calculate_summary_stats_v3.py \
+  --out results.csv \
+  --args "--size 3.3 --no-append --dir /private/nanopore/basecalled/MyProject"
 ```
 
 The `pullstats_*` shell functions (defined in `bashrc_additions.sh`) activate conda and call the appropriate Python script.
