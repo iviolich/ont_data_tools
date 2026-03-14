@@ -221,7 +221,7 @@ def main(myCommandLine=None):
     parser.add_argument("-n", "--name", help="The sample name")
     # --dir option for directory mode
     parser.add_argument("--dir", dest="directory", type=str, default=None,
-                        help="Directory or wildcard pattern to search for files starting with 'sequencing_summary'")
+                        help="Directory or wildcard pattern to search for files starting with 'sequencing_summary' or ending with '_summary.txt.gz'")
     # --shortname option (choice yes/no, default yes)
     parser.add_argument("--shortname", dest="shortname", choices=["yes", "no"], default="yes",
                         help="If 'yes' (default), output only the second field from the file path; if 'no', output the full file path.")
@@ -252,7 +252,9 @@ def main(myCommandLine=None):
         for d in dirs:
             if not os.path.isdir(d):
                 continue
-            files = glob.glob(os.path.join(d, "**", "sequencing_summary*"), recursive=True)
+            seq_summary_files = glob.glob(os.path.join(d, "**", "sequencing_summary*"), recursive=True)
+            summary_files     = glob.glob(os.path.join(d, "**", "*_summary.txt.gz"), recursive=True)
+            files = seq_summary_files + summary_files
             if not files:
                 sys.stderr.write("Warning: No sequencing_summary files found in directory %s\n" % d)
                 continue
