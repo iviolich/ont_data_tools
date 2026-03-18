@@ -209,18 +209,26 @@ sbatch -J summary_SAMPLE --array=1-4 summary_dorado_slurm.sh \
 
 ### Summary Statistics
 
-```bash
-# DNA stats for all runs matching a pattern (local)
-pullstats_dna_ul --size 3.3 --dir "/data/run_*"
+The `--nameby` option controls how each row is labelled:
+- `dirname` — use the name of the directory matched by `--dir` (recommended locally, where summary files are deep inside per-sample directories)
+- `filename` — use the basename of the summary file itself (recommended on the cluster, where BAM-named summaries are in a flat output directory)
+- `path` — use the full file path
 
-# RNA stats (local)
-pullstats_rna --dir "/data/rna_run_*"
+```bash
+# DNA stats — local PromethION, label by matched directory name
+pullstats_dna_ul --size 3.3 --dir "*DogT2T*" --nameby dirname
+
+# DNA stats — cluster flat output dir, label by filename
+pullstats_dna_ul --size 3.3 --dir "/private/nanopore/basecalled/MyProject" --nameby filename
+
+# RNA stats — local PromethION
+pullstats_rna --dir "*RNA*" --nameby dirname
 
 # Any stats script on SLURM (avoids running on login node)
 sbatch -J stats_SAMPLE run_stats_slurm.sh \
   --script /path/to/calculate_summary_stats_v3.py \
   --out results.csv \
-  --args "--size 3.3 --no-append --dir /private/nanopore/basecalled/MyProject"
+  --args "--size 3.3 --no-append --nameby filename --dir /private/nanopore/basecalled/MyProject"
 ```
 
 The `pullstats_*` shell functions (defined in `bashrc_additions.sh`) activate conda and call the appropriate Python script.
