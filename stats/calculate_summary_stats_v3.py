@@ -8,23 +8,27 @@ Based on the original script by Miten Jain, this version:
      the script will expand the pattern, search each matching directory recursively for
      files starting with "sequencing_summary" OR ending with "_summary.txt.gz",
      process each file individually, and output a CSV table.
-  3. Adds a --shortname option that accepts "yes" (default) or "no". If "yes", the "File" field is replaced
-     by the second field of the file path (delimited by '/'); if "no", the full file path is used.
-  4. Adds a --append option (default "fast") to append an underscore and a string to the file name.
+  3. Adds a --nameby option (default "filename") controlling how the "File" label is derived:
+       filename  — basename of the summary file (good for cluster flat output dirs where the
+                   BAM name is baked into the filename, e.g. Sample_fast_summary.txt.gz)
+       dirname   — basename of the matched --dir directory (good for local PromethION runs
+                   where summary files are deep inside per-sample directories)
+       path      — full file path
+  4. Adds a --append option to append an underscore and a string to the label.
      If you don't want anything appended, use --no-append to override --append.
   5. Uses the **first field of each read's pod5 filename** (split on _) as "flowcell_id".
   6. Now supports both regular summary files (with "filename" column) and live basecalling
      summary files (with "filename_pod5" column).
 
 Usage Examples:
-  Aggregated mode (default behavior, with shortname and appended "fast"):
+  Aggregated mode:
     python calculate_summary_stats_v3.py --size 3.3 file1.txt file2.txt
 
-  Directory mode (with default --shortname and appended "_fast"):
-    python calculate_summary_stats_v3.py --size 3.3 --dir "*EnTEX*"
+  Directory mode, label by matched directory name (local PromethION):
+    python calculate_summary_stats_v3.py --size 3.3 --dir "*EnTEX*" --nameby dirname
 
-  To run without shortening the file name:
-    python calculate_summary_stats_v3.py --size 3.3 --shortname no --dir "*EnTEX*"
+  Directory mode, label by filename (cluster flat output dir):
+    python calculate_summary_stats_v3.py --size 3.3 --dir "/project/out" --nameby filename
 
   To run without appending any string:
     python calculate_summary_stats_v3.py --size 3.3 --no-append --dir "*EnTEX*"
@@ -39,24 +43,24 @@ import glob
 import csv
 from optparse import OptionParser
 
-def transform_file_field(file_field, shortname_option):
+def get_label(filepath, dirpath, nameby):
     """
-    Transforms the file_field based on the shortname_option.
-    If shortname_option is "yes", then:
-      - If file_field is a comma‐separated list (aggregated mode),
-        it transforms each component by splitting on "/" and using the second field.
-      - Otherwise, it does the same for a single file path.
-    If shortname_option is "no", the original file_field is returned.
-    """
-    if shortname_option != "yes":
-        return file_field
+    Return the sample label for a summary file.
 
-    # Handle aggregated mode (multiple file paths separated by commas)
-    if "," in file_field:
-        files_list = file_field.split(",")
-        return ",".join(os.path.basename(item) for item in files_list)
-    else:
-        return os.path.basename(file_field)
+    filepath : path to the summary file (may be comma-joined in aggregated mode)
+    dirpath  : the directory matched by --dir glob (None in aggregated/file-list mode)
+    nameby   : 'filename', 'dirname', or 'path'
+
+    dirname falls back to filename when dirpath is None (aggregated mode).
+    """
+    if nameby == "path":
+        return filepath
+    if nameby == "dirname" and dirpath is not None:
+        return os.path.basename(dirpath)
+    # filename (or dirname fallback)
+    if "," in filepath:
+        return ",".join(os.path.basename(p) for p in filepath.split(","))
+    return os.path.basename(filepath)
 
 def process_single_file(inFile, actual_genome_size):
     """
@@ -285,8 +289,8 @@ def main(myCommandLine=None):
                       help="Genome size in gigabases for coverage calculations (REQUIRED)")
     parser.add_option("--dir", dest="directory", type="string", default=None,
                       help="Directory or wildcard pattern to search for directories containing files starting with 'sequencing_summary' or ending with '_summary.txt.gz'")
-    parser.add_option("--shortname", dest="shortname", type="choice", choices=["yes", "no"], default="yes",
-                      help="If 'yes' (default), output only the second field from the file path; if 'no', output the full file path.")
+    parser.add_option("--nameby", dest="nameby", type="choice", choices=["filename", "dirname", "path"], default="filename",
+                      help="How to label each row: 'filename' (default) uses the summary file's basename; 'dirname' uses the matched --dir directory name; 'path' uses the full file path.")
     parser.add_option("--append", dest="append_str", type="string", default="",
                       help="Optional string to append to the file name (default: none)")
     parser.add_option("--no-append", dest="append_str", action="store_const", const="",
@@ -344,14 +348,11 @@ def main(myCommandLine=None):
                 if stats is None:
                     continue
 
-                # Shorten "File" if requested
-                stats["File"] = transform_file_field(stats["File"], options.shortname)
+                stats["File"] = get_label(f, d, options.nameby)
 
-                # Append string if provided
                 if options.append_str:
                     stats["File"] = stats["File"] + "_" + options.append_str
 
-                # Write out all columns
                 row = [str(stats[col]) for col in header]
                 writer.writerow(row)
 
@@ -359,7 +360,7 @@ def main(myCommandLine=None):
     elif args:
         stats = process_aggregated_files(args, actual_genome_size)
         if stats:
-            stats["File"] = transform_file_field(stats["File"], options.shortname)
+            stats["File"] = get_label(stats["File"], None, options.nameby)
             if options.append_str:
                 stats["File"] = stats["File"] + "_" + options.append_str
             row = [str(stats[col]) for col in header]

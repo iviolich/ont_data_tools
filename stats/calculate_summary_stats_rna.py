@@ -1,45 +1,60 @@
 #!/usr/bin/env python
 """
-pullstats_rna.py
+calculate_summary_stats_rna.py
 
-This script computes RNA sequencing metrics (in millions of reads rather than coverage).
-It calculates total gigabases, N50, total reads (in millions), and counts (in millions)
-for various quality bins.
+Computes RNA sequencing metrics (in millions of reads rather than genome coverage).
+Reports total gigabases, N50, total reads, and read counts at q5/q10/q15/q20/q25 thresholds.
 
-Additional options:
+Options:
   --dir        : Directory or wildcard pattern to search for files starting with "sequencing_summary"
                  or ending with "_summary.txt.gz".
                  (If provided, the script processes each matching file individually.)
-  --shortname  : If "yes" (default), the sample name is derived by taking the second field (delimited by '/')
-                 from the file path. If "no", the full file path is used.
-  --append     : A string to append (with an underscore) to the sample name (default: "fast").
+  --nameby     : How to label each row (default: "filename"):
+                   filename  — basename of the summary file (good for cluster flat output dirs
+                               where the BAM name is baked into the filename)
+                   dirname   — basename of the matched --dir directory (good for local PromethION
+                               runs where summary files are deep inside per-sample directories)
+                   path      — full file path
+  --append     : A string to append (with an underscore) to the sample name (default: none).
   --no-append  : Overrides --append and does not append any string.
+  -n/--name    : Override the sample name (aggregated mode only).
 
-Positional arguments (nfile) are used in aggregated mode.
-An optional sample name can be provided with -n/--name.
+Usage Examples:
+  Aggregated mode:
+    python calculate_summary_stats_rna.py file1.txt file2.txt
+
+  Aggregated mode with explicit sample name:
+    python calculate_summary_stats_rna.py -n MySample file1.txt file2.txt
+
+  Directory mode, label by matched directory name (local PromethION):
+    python calculate_summary_stats_rna.py --dir "*RNA*" --nameby dirname
+
+  Directory mode, label by filename (cluster flat output dir):
+    python calculate_summary_stats_rna.py --dir "/project/out" --nameby filename
 """
 
 import os, sys, time, gzip, glob, csv
 import argparse
 
 
-def transform_file_field(file_field, shortname_option):
+def get_label(filepath, dirpath, nameby):
     """
-    Transforms the file_field based on the shortname_option.
-    If shortname_option is "yes", then:
-      - For a comma‐separated list (aggregated mode), it transforms each component by splitting on "/"
-        and using the second field.
-      - Otherwise, it does the same for a single file path.
-    If shortname_option is "no", the original file_field is returned.
-    """
-    if shortname_option != "yes":
-        return file_field
+    Return the sample label for a summary file.
 
-    if "," in file_field:
-        files_list = file_field.split(",")
-        return ",".join(os.path.basename(item) for item in files_list)
-    else:
-        return os.path.basename(file_field)
+    filepath : path to the summary file (may be comma-joined in aggregated mode)
+    dirpath  : the directory matched by --dir glob (None in aggregated/file-list mode)
+    nameby   : 'filename', 'dirname', or 'path'
+
+    dirname falls back to filename when dirpath is None (aggregated mode).
+    """
+    if nameby == "path":
+        return filepath
+    if nameby == "dirname" and dirpath is not None:
+        return os.path.basename(dirpath)
+    # filename (or dirname fallback)
+    if "," in filepath:
+        return ",".join(os.path.basename(p) for p in filepath.split(","))
+    return os.path.basename(filepath)
 
 
 def _open_file(inFile):
@@ -194,8 +209,8 @@ def main(myCommandLine=None):
     parser.add_argument("-n", "--name", help="The sample name")
     parser.add_argument("--dir", dest="directory", type=str, default=None,
                         help="Directory or wildcard pattern to search for files starting with 'sequencing_summary' or ending with '_summary.txt.gz'")
-    parser.add_argument("--shortname", dest="shortname", choices=["yes", "no"], default="yes",
-                        help="If 'yes' (default), output only the second field from the file path; if 'no', output the full file path.")
+    parser.add_argument("--nameby", dest="nameby", choices=["filename", "dirname", "path"], default="filename",
+                        help="How to label each row: 'filename' (default) uses the summary file's basename; 'dirname' uses the matched --dir directory name; 'path' uses the full file path.")
     parser.add_argument("--append", dest="append_str", type=str, default="",
                         help="Optional string to append to the sample name (default: none)")
     parser.add_argument("--no-append", dest="append_str", action="store_const", const="",
@@ -229,20 +244,21 @@ def main(myCommandLine=None):
             for f in files:
                 res = process_rna_file(f)
                 if res is not None:
+                    res["Sample"] = get_label(f, d, args.nameby)
+                    if args.append_str:
+                        res["Sample"] = res["Sample"] + "_" + args.append_str
                     results.append(res)
         for res in results:
-            res["Sample"] = transform_file_field(res["Sample"], args.shortname)
-            if args.append_str:
-                res["Sample"] = res["Sample"] + "_" + args.append_str
             writer.writerow([str(res[col]) for col in header])
     else:
         res = process_aggregated_rna_files(args.nfile)
         if res is None:
             sys.stderr.write("No data processed.\n")
             sys.exit(1)
-        sample_field = args.name if args.name else res["Sample"]
-        res["Sample"] = sample_field
-        res["Sample"] = transform_file_field(res["Sample"], args.shortname)
+        if args.name:
+            res["Sample"] = args.name
+        else:
+            res["Sample"] = get_label(res["Sample"], None, args.nameby)
         if args.append_str:
             res["Sample"] = res["Sample"] + "_" + args.append_str
         writer.writerow([str(res[col]) for col in header])
