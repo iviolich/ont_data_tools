@@ -2,7 +2,7 @@
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --mem=128gb
-##SBATCH --exclude=phoenix-00
+#SBATCH --exclude=phoenix-00
 #SBATCH --gpus-per-node=8
 #SBATCH --cpus-per-task=64
 #SBATCH --output=%x_%j_%A_%a.log
